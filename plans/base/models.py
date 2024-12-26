@@ -142,10 +142,21 @@ class AbstractPlan(BaseMixin, OrderedModel):
 
     def get_quota_dict(self):
         return dict(self.planquota_set.values_list("quota__codename", "value"))
-
+    def get_quota(self):
+        return dict(self.planquota_set.values_list("quota__name", "value"))
     def is_free(self):
         return self.planpricing_set.count() == 0
 
+    def price(self):
+        pricing = self.planpricing_set.first()
+        if pricing:
+            return pricing.price
+        return 0
+    def regular_price(self):
+        pricing = self.planpricing_set.first()
+        if pricing:
+            return pricing.regular_price
+        return 0
     is_free.boolean = True
 
 
@@ -762,6 +773,7 @@ class AbstractPlanPricing(BaseMixin, models.Model):
     plan = models.ForeignKey("Plan", on_delete=models.CASCADE)
     pricing = models.ForeignKey("Pricing", on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=7, decimal_places=2, db_index=True)
+    regular_price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     order = models.IntegerField(default=0, null=False, blank=False)
     has_automatic_renewal = models.BooleanField(
         _("has automatic renewal"),
