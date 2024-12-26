@@ -53,11 +53,33 @@ class UserLinkMixin(object):
 
 class PlanQuotaInline(admin.TabularInline):
     model = PlanQuota
-
+    def has_add_permission(self, request, obj=None):
+        # Allow adding only when creating a new plan
+        return obj is None
+        
+    def has_delete_permission(self, request, obj=None):
+        # Allow deletion only when creating a new plan
+        return obj is None
+    
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # Only make readonly on change form
+            return [field.name for field in PlanQuota._meta.fields]
+        return []
 
 class PlanPricingInline(admin.TabularInline):
     model = PlanPricing
-
+    def has_add_permission(self, request, obj=None):
+        # Allow adding only when creating a new plan
+        return obj is None
+        
+    def has_delete_permission(self, request, obj=None):
+        # Allow deletion only when creating a new plan
+        return obj is None
+    
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # Only make readonly on change form
+            return [field.name for field in PlanPricing._meta.fields]
+        return []
 
 class QuotaAdmin(OrderedModelAdmin):
     list_display = [
@@ -169,6 +191,15 @@ class PlanAdmin(OrderedModelAdmin):
                         )
                     )
                 ))
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # Only make readonly on change form
+            # Get all model fields
+            all_fields = [field.name for field in self.model._meta.fields]
+            # Remove 'available' and 'visible' from readonly fields
+            readonly_fields = [f for f in all_fields if f not in ('available', 'visible','default')]
+            return readonly_fields
+        return self.readonly_fields  # Use default readonly_fields for add form
 
     def get_price(self, obj):
         pricing = obj.planpricing_set.first()
