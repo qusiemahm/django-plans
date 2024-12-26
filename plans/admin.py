@@ -21,6 +21,9 @@ from plans.base.models import (
 )
 
 from .signals import account_automatic_renewal
+from django.db.models import Count, Q, Min
+from django.utils import timezone
+from django.conf import settings
 
 Invoice = AbstractInvoice.get_concrete_model()
 UserPlan = AbstractUserPlan.get_concrete_model()
@@ -95,6 +98,33 @@ def copy_plan(modeladmin, request, queryset):
 
 copy_plan.short_description = _("Make a plan copy")
 
+class PricingRangeFilter(admin.SimpleListFilter):
+    title = 'Price Range'
+    parameter_name = 'price_range'
+
+    def lookups(self, request, model_admin):
+        cu=settings.PLANS_CURRENCY
+        return (
+            ('free', 'Free'),
+            ('1_300', f'1 {cu} to 300 {cu}'),
+            ('301_plus', f'above 300 {cu}'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'free':
+            return queryset.filter(
+                Q(planpricing__price=0) | Q(planpricing__isnull=True)
+            ).distinct()
+        elif self.value() == '1_300':
+            return queryset.filter(
+                planpricing__price__gt=0,
+                planpricing__price__lte=300
+            ).distinct()
+        elif self.value() == '301_plus':
+            return queryset.filter(
+                planpricing__price__gt=300
+            ).distinct()
+        return queryset
 
 class PlanAdmin(OrderedModelAdmin):
     search_fields = (
@@ -102,16 +132,16 @@ class PlanAdmin(OrderedModelAdmin):
         "customized__username",
         "customized__email",
     )
-    list_filter = ("available", "visible")
+    list_filter = ("available", "visible", PricingRangeFilter,)
     list_display = [
         "name",
         "description",
-        "customized",
-        "default",
+        "get_price",
+        "get_active_subscribers",
+        "get_trial_period",
+        "visible",
         "available",
-        "is_free",
         "created",
-        "move_up_down_links",
     ]
     list_display_links = list_display
     inlines = (PlanPricingInline, PlanQuotaInline)
@@ -121,9 +151,44 @@ class PlanAdmin(OrderedModelAdmin):
     actions = [
         copy_plan,
     ]
+    def get_queryset(self, request):
+        return (super(PlanAdmin, self)
+                .get_queryset(request)
+                .select_related("customized")
+                .prefetch_related("planpricing_set")
+                .annotate(
+                    min_price=Min('planpricing__price'),
+                    active_subscribers_count=Count(
+                        'userplan',
+                        filter=Q(
+                            userplan__active=True,
+                            userplan__expire__isnull=True
+                        ) | Q(
+                            userplan__active=True,
+                            userplan__expire__gte=timezone.now().date()
+                        )
+                    )
+                ))
 
-    def queryset(self, request):
-        return super(PlanAdmin, self).queryset(request).select_related("customized")
+    def get_price(self, obj):
+        pricing = obj.planpricing_set.first()
+        if pricing:
+            return f"{pricing.price} {settings.PLANS_CURRENCY}"
+        return "-"
+    get_price.short_description = "Pricing"
+    get_price.admin_order_field = 'min_price'  # Enable sorting by price
+
+    def get_trial_period(self, obj):
+        trial_period = settings.PLANS_ORDER_EXPIRATION
+        if trial_period:
+            return trial_period
+        return 0
+    get_trial_period.short_description = "Trial period in days"
+
+    def get_active_subscribers(self, obj):
+        return getattr(obj, 'active_subscribers_count', 0)
+    get_active_subscribers.short_description = "Active Subscribers"
+    get_active_subscribers.admin_order_field = 'active_subscribers_count'  # Enable sorting by subscriber count
 
 
 class BillingInfoAdmin(UserLinkMixin, admin.ModelAdmin):
