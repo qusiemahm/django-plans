@@ -366,6 +366,7 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
     list_display = (
         "user",
         "plan",
+        "branches", 
         "expire",
         "active",
         "recurring__renewal_triggered_by",
@@ -380,7 +381,7 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
     actions = [
         autorenew_payment,
     ]
-    fields = ("user", "user_link", "plan", "expire", "active", "created", "updated_at")
+    fields = ("user", "user_link", "plan","branches", "expire",  "active", "created", "updated_at")
     raw_id_fields = [
         "user",
         "plan",

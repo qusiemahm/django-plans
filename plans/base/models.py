@@ -243,6 +243,7 @@ class AbstractUserPlan(BaseMixin, models.Model):
     expire = models.DateField(
         _("expire"), default=None, blank=True, null=True, db_index=True
     )
+    branches = models.PositiveIntegerField(default=1)
     active = models.BooleanField(_("active"), default=True, db_index=True)
 
     class Meta:
