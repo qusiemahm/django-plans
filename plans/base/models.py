@@ -143,20 +143,21 @@ class AbstractPlan(BaseMixin, OrderedModel):
     def get_quota_dict(self):
         return dict(self.planquota_set.values_list("quota__codename", "value"))
     def get_quota(self):
-        return dict(self.planquota_set.values_list("quota__name", "value"))
+        return self.quotas.all()
     def is_free(self):
         return self.planpricing_set.count() == 0
-
     def price(self):
         pricing = self.planpricing_set.first()
         if pricing:
             return pricing.price
         return 0
-    def regular_price(self):
+
+    def pricing(self):
         pricing = self.planpricing_set.first()
         if pricing:
-            return pricing.regular_price
-        return 0
+            return pricing
+        return None
+
     is_free.boolean = True
 
 
