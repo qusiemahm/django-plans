@@ -10,6 +10,7 @@ import stdnum.eu.vat
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
+from django.core.validators import MinValueValidator
 
 try:
     from django.contrib.sites.models import Site
@@ -774,8 +775,8 @@ class PlanPricingManager(models.Manager):
 class AbstractPlanPricing(BaseMixin, models.Model):
     plan = models.ForeignKey("Plan", on_delete=models.CASCADE)
     pricing = models.ForeignKey("Pricing", on_delete=models.CASCADE)
-    price = models.DecimalField(max_digits=7, decimal_places=2, db_index=True)
-    regular_price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(max_digits=7, decimal_places=2, db_index=True, validators=[MinValueValidator(1)])
+    regular_price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(1)])
     order = models.IntegerField(default=0, null=False, blank=False)
     has_automatic_renewal = models.BooleanField(
         _("has automatic renewal"),
