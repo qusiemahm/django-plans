@@ -108,7 +108,12 @@ class AbstractPlan(BaseMixin, OrderedModel):
             "Optional link to page with more information (for clickable pricing table headers)"
         ),
     )
-
+    plan_for = models.CharField(
+        max_length=20,
+        choices=[("vendors", _('vendors')),("schools", _('schools')),],
+        default="vendors",
+        verbose_name=_("Plan for")
+    )
     class Meta:
         abstract = True
         ordering = ("order",)
