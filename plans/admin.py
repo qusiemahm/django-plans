@@ -381,7 +381,7 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
     actions = [
         autorenew_payment,
     ]
-    fields = ("user", "user_link", "plan","branches", "expire",  "active", "created", "updated_at")
+    fields = ("user", "user_link", "plan","branches","students", "expire",  "active", "created", "updated_at")
     raw_id_fields = [
         "user",
         "plan",

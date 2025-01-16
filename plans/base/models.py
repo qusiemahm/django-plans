@@ -149,7 +149,14 @@ class AbstractPlan(BaseMixin, OrderedModel):
     def get_quota_dict(self):
         return dict(self.planquota_set.values_list("quota__codename", "value"))
     def get_quota(self):
-        return self.quotas.all()
+        quotas =self.planquota_set.values_list("quota__name","quota__unit", "value")
+        quota_dict = {
+            quota[0]: {
+                'unit': quota[1],
+                'value': quota[2]
+            } for quota in quotas
+        }
+        return quota_dict
     def is_free(self):
         return self.planpricing_set.count() == 0
     def price(self):
@@ -251,6 +258,7 @@ class AbstractUserPlan(BaseMixin, models.Model):
         _("expire"), default=None, blank=True, null=True, db_index=True
     )
     branches = models.PositiveIntegerField(default=1)
+    students = models.PositiveIntegerField(default=1)
     active = models.BooleanField(_("active"), default=True, db_index=True)
 
     class Meta:
