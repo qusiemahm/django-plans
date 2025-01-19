@@ -114,6 +114,8 @@ class AbstractPlan(BaseMixin, OrderedModel):
         default="vendors",
         verbose_name=_("Plan for")
     )
+    price_per_student = models.DecimalField(max_digits=7, decimal_places=2, default=0 ,db_index=True, validators=[MinValueValidator(0)])
+    
     class Meta:
         abstract = True
         ordering = ("order",)
@@ -149,11 +151,13 @@ class AbstractPlan(BaseMixin, OrderedModel):
     def get_quota_dict(self):
         return dict(self.planquota_set.values_list("quota__codename", "value"))
     def get_quota(self):
-        quotas =self.planquota_set.values_list("quota__name","quota__unit", "value")
+        quotas =self.planquota_set.values_list("quota__name","quota__name_ar", "quota__unit", "quota__unit_ar", "value")
         quota_dict = {
             quota[0]: {
-                'unit': quota[1],
-                'value': quota[2]
+                'name_ar': quota[1],
+                'unit': quota[2],
+                'unit_ar': quota[3],
+                'value': quota[4]
             } for quota in quotas
         }
         return quota_dict
@@ -557,6 +561,9 @@ class AbstractUserPlan(BaseMixin, models.Model):
     def get_current_plan(self):
         """Tiny helper, very usefull in templates"""
         return AbstractPlan.get_concrete_model().get_current_plan(self.user)
+    @property
+    def price(self):
+        return (self.plan.price_per_student * students) + (self.plan.price() * branches)
 
 
 class AbstractRecurringUserPlan(BaseMixin, models.Model):
