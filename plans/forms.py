@@ -3,10 +3,19 @@ from django.core.exceptions import ValidationError
 from django.forms.widgets import HiddenInput
 from django.utils.translation import gettext
 
-from plans.base.models import AbstractBillingInfo, AbstractOrder, AbstractPlanPricing
-
 from .utils import get_country_code
+from plans.base.models import (
+    AbstractBillingInfo,
+    AbstractOrder,
+    AbstractPlan,
+    AbstractPlanPricing,
+    AbstractPricing,
+    AbstractQuota,
+)
 
+Plan = AbstractPlan.get_concrete_model()
+Quota = AbstractQuota.get_concrete_model()
+Pricing = AbstractPricing.get_concrete_model()
 Order = AbstractOrder.get_concrete_model()
 PlanPricing = AbstractPlanPricing.get_concrete_model()
 BillingInfo = AbstractBillingInfo.get_concrete_model()
@@ -71,3 +80,36 @@ class FakePaymentsForm(forms.Form):
     status = forms.ChoiceField(
         choices=Order.STATUS, required=True, label=gettext("Change order status to")
     )
+
+class PlanAdminForm(forms.ModelForm):
+    class Meta:
+        model = Plan
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.fields['name_ar'].required = True
+            self.fields['name_en'].required = True
+            self.fields['description_ar'].required = True
+            self.fields['description_en'].required = True
+
+class PricingAdminForm(forms.ModelForm):
+    class Meta:
+        model = Pricing
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['name_ar'].required = True
+
+
+class QuotaAdminForm(forms.ModelForm):
+    class Meta:
+        model = Quota
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['name_ar'].required = True
+        self.fields['name_en'].required = True

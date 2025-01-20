@@ -24,7 +24,7 @@ from .signals import account_automatic_renewal
 from django.db.models import Count, Q, Min
 from django.utils import timezone
 from django.conf import settings
-
+from .forms import PlanAdminForm, PricingAdminForm, QuotaAdminForm
 Invoice = AbstractInvoice.get_concrete_model()
 UserPlan = AbstractUserPlan.get_concrete_model()
 Plan = AbstractPlan.get_concrete_model()
@@ -81,7 +81,12 @@ class PlanPricingInline(admin.TabularInline):
             return [field.name for field in PlanPricing._meta.fields]
         return []
 
+class PricingAdmin(admin.ModelAdmin):
+    form = PricingAdminForm
+
+        
 class QuotaAdmin(OrderedModelAdmin):
+    form = QuotaAdminForm
     list_display = [
         "codename",
         "name",
@@ -149,6 +154,7 @@ class PricingRangeFilter(admin.SimpleListFilter):
         return queryset
 
 class PlanAdmin(OrderedModelAdmin):
+    form = PlanAdminForm
     search_fields = (
         "name",
         "customized__username",
@@ -220,7 +226,13 @@ class PlanAdmin(OrderedModelAdmin):
         return getattr(obj, 'active_subscribers_count', 0)
     get_active_subscribers.short_description = "Active Subscribers"
     get_active_subscribers.admin_order_field = 'active_subscribers_count'  # Enable sorting by subscriber count
-
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        fields.remove("name")
+        fields.remove("description")
+        if obj and obj.plan_for == "vendors":
+            fields.remove("price_per_student")
+        return fields
 
 class BillingInfoAdmin(UserLinkMixin, admin.ModelAdmin):
     search_fields = ("user__username", "user__email", "tax_number", "name")
@@ -412,12 +424,16 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
         return obj.recurring.pricing
 
     recurring__pricing.admin_order_field = "recurring__pricing"
-
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        if obj and obj.plan.plan_for == "vendors":
+            fields.remove("students")
+        return fields
 
 admin.site.register(Quota, QuotaAdmin)
 admin.site.register(Plan, PlanAdmin)
 admin.site.register(UserPlan, UserPlanAdmin)
-admin.site.register(Pricing)
+admin.site.register(Pricing, PricingAdmin)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(BillingInfo, BillingInfoAdmin)
 admin.site.register(Invoice, InvoiceAdmin)
