@@ -409,6 +409,8 @@ class AbstractUserPlan(BaseMixin, models.Model):
         self.recurring.amount = order.amount
         self.recurring.tax = order.tax
         self.recurring.currency = order.currency
+        self.recurring.students_number = order.students_number
+        self.recurring.branches_number = order.branches_number
         self.recurring.renewal_triggered_by = renewal_triggered_by
         for k, v in kwargs.items():
             setattr(self.recurring, k, v)
@@ -563,7 +565,7 @@ class AbstractUserPlan(BaseMixin, models.Model):
         return AbstractPlan.get_concrete_model().get_current_plan(self.user)
     @property
     def price(self):
-        return (self.plan.price_per_student * students) + (self.plan.price() * branches)
+        return (self.plan.price_per_student * self.students) + (self.plan.price() * self.branches)
 
 
 class AbstractRecurringUserPlan(BaseMixin, models.Model):
@@ -620,6 +622,16 @@ class AbstractRecurringUserPlan(BaseMixin, models.Model):
     tax = models.DecimalField(
         _("tax"), max_digits=4, decimal_places=2, db_index=True, null=True, blank=True
     )  # Tax=None is when tax is not applicable
+    branches_number = models.PositiveIntegerField(
+        _("Branches Number"),
+        null=True,
+        blank=True,
+    )  # branches_number=None is when branches is not applicable
+    students_number = models.PositiveIntegerField(
+        _("Students number"),
+        null=True,
+        blank=True,
+    )  # students_number=None is when students is not applicable
     currency = models.CharField(_("currency"), max_length=3)
     renewal_triggered_by = models.IntegerField(
         _("renewal triggered by"),
@@ -697,6 +709,8 @@ class AbstractRecurringUserPlan(BaseMixin, models.Model):
             pricing=userplan.recurring.pricing,
             amount=userplan.recurring.amount,
             tax=userplan.recurring.tax,  # Fallback value in case of VIES fault
+            branches_number=userplan.recurring.branches_number,  # Fallback value in case of VIES fault
+            students_number=userplan.recurring.students_number,  # Fallback value in case of VIES fault
             currency=userplan.recurring.currency,
         )
         order.recalculate(
@@ -902,6 +916,24 @@ class AbstractOrder(BaseMixin, models.Model):
     tax = models.DecimalField(
         _("tax"), max_digits=4, decimal_places=2, db_index=True, null=True, blank=True
     )  # Tax=None is when tax is not applicable
+    branches_number = models.PositiveIntegerField(
+        _("Branches Number"),
+        null=True,
+        blank=True,
+    )  # branches=None is when branches is not applicable
+    students_number = models.PositiveIntegerField(
+        _("Students number"),
+        null=True,
+        blank=True,
+    )  # students=None is when students is not applicable
+    first_time_fees = models.DecimalField(
+        _("First time fees"),
+        max_digits=4,
+        decimal_places=2,
+        db_index=True,
+        null=True,
+        blank=True,
+    )  # first_time_fees=None is when first time fees is not applicable
     currency = models.CharField(_("currency"), max_length=3, default="EUR")
     status = models.IntegerField(_("status"), choices=STATUS, default=STATUS.NEW)
 
@@ -1012,12 +1044,19 @@ class AbstractOrder(BaseMixin, models.Model):
             return self.total() - self.amount
 
     def total(self):
+        amount = self.amount
+        if self.branches_number:
+            amount = amount * self.branches_number
+        if self.students_number:
+            amount = amount + (self.plan.price_per_student * self.students_number)
+        if self.first_time_fees:
+            amount = amount + self.first_time_fees
         if self.tax is not None:
-            return (Decimal(self.amount) * (Decimal(self.tax) + 100) / 100).quantize(
+            return (Decimal(amount) * (Decimal(self.tax) + 100) / 100).quantize(
                 Decimal("1.00")
             )
         else:
-            return self.amount
+            return amount
 
     def get_absolute_url(self):
         return reverse("order", kwargs={"pk": self.pk})
@@ -1342,6 +1381,9 @@ class AbstractInvoice(BaseMixin, models.Model):
         self.tax_total = order.total() - order.amount
         self.tax = order.tax
         self.currency = order.currency
+        self.students_number = order.students_number
+        self.branches_number = order.branches_number
+        self.first_time_fees = order.first_time_fees
         if Site is not None:
             self.item_description = "%s - %s" % (
                 Site.objects.get_current().name,
