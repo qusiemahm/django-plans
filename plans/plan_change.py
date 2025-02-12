@@ -5,7 +5,7 @@ from plans.importer import import_name
 
 
 class PlanChangePolicy(object):
-    def _calculate_day_cost(self, plan, period):
+    def _calculate_day_cost(self, userplan, plan, period):
         """
         Finds most fitted plan pricing for a given period, and calculate day cost
         """
@@ -23,7 +23,10 @@ class PlanChangePolicy(object):
                 break
 
         if selected_pricing:
-            return (selected_pricing.price / selected_pricing.pricing.period).quantize(
+            price = selected_pricing.price * userplan.branches
+            if plan.plan_for == "schools":
+                price = price + plan.price_per_student * userplan.students
+                return (price / selected_pricing.pricing.period).quantize(
                 Decimal("1.00")
             )
 
@@ -35,15 +38,15 @@ class PlanChangePolicy(object):
         else:
             return period * day_cost_diff
 
-    def get_change_price(self, plan_old, plan_new, period):
+    def get_change_price(self, userplan, plan_old, plan_new, period):
         """
         Calculates total price of plan change. Returns None if no payment is required.
         """
         if period is None or period < 1:
             return None
 
-        plan_old_day_cost = self._calculate_day_cost(plan_old, period)
-        plan_new_day_cost = self._calculate_day_cost(plan_new, period)
+        plan_old_day_cost = self._calculate_day_cost(userplan, plan_old, period)
+        plan_new_day_cost = self._calculate_day_cost(userplan, plan_new, period)
 
         if plan_new_day_cost <= plan_old_day_cost:
             return self._calculate_final_price(period, None)
@@ -91,13 +94,13 @@ class StandardPlanChangePolicy(PlanChangePolicy):
         if day_cost_diff is None:
             return self.DOWNGRADE_CHARGE
         cost = (
-            period * day_cost_diff * (self.UPGRADE_PERCENT_RATE / 100 + 1)
-            + self.UPGRADE_CHARGE
+            period * day_cost_diff 
         ).quantize(Decimal("1.00"))
         if cost is None or cost < self.FREE_UPGRADE:
             return None
         else:
             return cost
+        
 
 
 def get_policy():
