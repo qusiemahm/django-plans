@@ -115,7 +115,8 @@ class AbstractPlan(BaseMixin, OrderedModel):
         verbose_name=_("Plan for")
     )
     price_per_student = models.DecimalField(max_digits=7, decimal_places=2, default=0 ,db_index=True, validators=[MinValueValidator(0)])
-    
+    free_trial_days = models.PositiveIntegerField(default=0, verbose_name=_("Free Trial Days"))
+
     class Meta:
         abstract = True
         ordering = ("order",)
@@ -264,7 +265,18 @@ class AbstractUserPlan(BaseMixin, models.Model):
     branches = models.PositiveIntegerField(default=1)
     students = models.PositiveIntegerField(default=1)
     active = models.BooleanField(_("active"), default=True, db_index=True)
-
+    canceled_date = models.DateField(
+        _("Canceled Date"), default=None, blank=True, null=True, db_index=True
+    )
+    activated_date = models.DateField(
+        _("Activated Date"), default=None, blank=True, null=True, db_index=True
+    )
+    trial_start_date = models.DateField(
+        _("Trial Start Date"), default=None, blank=True, null=True, db_index=True
+    )
+    trial_end_date = models.DateField(
+        _("Trial End Date"), default=None, blank=True, null=True, db_index=True
+    )
     class Meta:
         abstract = True
         verbose_name = _("User plan")
@@ -281,6 +293,12 @@ class AbstractUserPlan(BaseMixin, models.Model):
             return False
         else:
             return self.expire < date.today()
+
+    def is_trial(self):
+        if self.trial_start_date is None or self.trial_end_date is None:
+            return False
+        # Check if today's date is within the trial period
+        return self.trial_start_date <= date.today() <= self.trial_end_date
 
     def days_left(self):
         if self.expire is None:
@@ -300,8 +318,13 @@ class AbstractUserPlan(BaseMixin, models.Model):
     def activate(self):
         if not self.active:
             self.active = True
+            self.activated_date = date.today()
             self.save()
             account_activated.send(sender=self, user=self.user)
+
+    def cancel(self):
+        self.canceled_date = date.today()
+        self.save()
 
     def deactivate(self):
         if self.active:
@@ -311,9 +334,13 @@ class AbstractUserPlan(BaseMixin, models.Model):
 
     def initialize(self):
         """
-        Set up user plan for first use
+        Set up user plan for first use, including handling free trial dates.
         """
         if not self.is_active():
+            # Check if the plan has a free trial
+            if self.plan.free_trial_days > 0:
+                self.trial_start_date = now()  # Set the trial start date to now
+                self.trial_end_date = now() + timedelta(days=self.plan.free_trial_days)  # Set the trial end date
             # Plans without pricings don't need to expire
             if self.expire is None and self.plan.planpricing_set.count():
                 self.expire = now() + timedelta(
@@ -936,6 +963,7 @@ class AbstractOrder(BaseMixin, models.Model):
     )  # first_time_fees=None is when first time fees is not applicable
     currency = models.CharField(_("currency"), max_length=3, default="EUR")
     status = models.IntegerField(_("status"), choices=STATUS, default=STATUS.NEW)
+    tap_id = models.CharField(_("Tap ID"), max_length=256, null=True, blank=True)
 
     def __str__(self):
         return _("Order #%(id)d") % {"id": self.id}

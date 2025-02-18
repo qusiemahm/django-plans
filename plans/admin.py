@@ -84,7 +84,7 @@ class PlanPricingInline(admin.TabularInline):
 class PricingAdmin(admin.ModelAdmin):
     form = PricingAdminForm
 
-        
+
 class QuotaAdmin(OrderedModelAdmin):
     form = QuotaAdminForm
     list_display = [
@@ -198,14 +198,14 @@ class PlanAdmin(OrderedModelAdmin):
                     )
                 ))
 
-    def get_readonly_fields(self, request, obj=None):
-        if obj:  # Only make readonly on change form
-            # Get all model fields
-            all_fields = [field.name for field in self.model._meta.fields]
-            # Remove 'available' and 'visible' from readonly fields
-            readonly_fields = [f for f in all_fields if f not in ('available', 'visible','default')]
-            return readonly_fields
-        return self.readonly_fields  # Use default readonly_fields for add form
+    # def get_readonly_fields(self, request, obj=None):
+    #     if obj:  # Only make readonly on change form
+    #         # Get all model fields
+    #         all_fields = [field.name for field in self.model._meta.fields]
+    #         # Remove 'available' and 'visible' from readonly fields
+    #         readonly_fields = [f for f in all_fields if f not in ('available', 'visible','default')]
+    #         return readonly_fields
+    #     return self.readonly_fields  # Use default readonly_fields for add form
 
     def get_price(self, obj):
         pricing = obj.planpricing_set.first()
@@ -393,7 +393,21 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
     actions = [
         autorenew_payment,
     ]
-    fields = ("user", "user_link", "plan","branches","students", "expire",  "active", "created", "updated_at")
+    fields = (
+        "user",
+        "user_link",
+        "plan",
+        "branches",
+        "students",
+        "expire",
+        "active",
+        "canceled_date",
+        "activated_date",
+        "trial_start_date",
+        "trial_end_date",
+        "created",
+        "updated_at",
+    )
     raw_id_fields = [
         "user",
         "plan",
