@@ -46,6 +46,15 @@ from plans.validators import plan_validation
 accounts_logger = logging.getLogger("accounts")
 
 
+class UserPlanCancellationReason(models.Model):
+    reason = models.CharField(_("Reason"), db_index=True, max_length=256)
+    description = models.TextField(_("Description"), blank=True, null=True)
+    hidden = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.reason
+
+
 class BaseMixin(models.Model):
     created = models.DateTimeField(
         _("created"), db_index=True, auto_now_add=True, null=True
@@ -110,12 +119,23 @@ class AbstractPlan(BaseMixin, OrderedModel):
     )
     plan_for = models.CharField(
         max_length=20,
-        choices=[("vendors", _('vendors')),("schools", _('schools')),],
+        choices=[
+            ("vendors", _("vendors")),
+            ("schools", _("schools")),
+        ],
         default="vendors",
-        verbose_name=_("Plan for")
+        verbose_name=_("Plan for"),
     )
-    price_per_student = models.DecimalField(max_digits=7, decimal_places=2, default=0 ,db_index=True, validators=[MinValueValidator(0)])
-    free_trial_days = models.PositiveIntegerField(default=0, verbose_name=_("Free Trial Days"))
+    price_per_student = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        default=0,
+        db_index=True,
+        validators=[MinValueValidator(0)],
+    )
+    free_trial_days = models.PositiveIntegerField(
+        default=0, verbose_name=_("Free Trial Days")
+    )
 
     class Meta:
         abstract = True
@@ -151,19 +171,25 @@ class AbstractPlan(BaseMixin, OrderedModel):
 
     def get_quota_dict(self):
         return dict(self.planquota_set.values_list("quota__codename", "value"))
+
     def get_quota(self):
-        quotas =self.planquota_set.values_list("quota__name","quota__name_ar", "quota__unit", "quota__unit_ar", "value")
+        quotas = self.planquota_set.values_list(
+            "quota__name", "quota__name_ar", "quota__unit", "quota__unit_ar", "value"
+        )
         quota_dict = {
             quota[0]: {
-                'name_ar': quota[1],
-                'unit': quota[2],
-                'unit_ar': quota[3],
-                'value': quota[4]
-            } for quota in quotas
+                "name_ar": quota[1],
+                "unit": quota[2],
+                "unit_ar": quota[3],
+                "value": quota[4],
+            }
+            for quota in quotas
         }
         return quota_dict
+
     def is_free(self):
         return self.planpricing_set.count() == 0
+
     def price(self):
         pricing = self.planpricing_set.first()
         if pricing:
@@ -265,6 +291,15 @@ class AbstractUserPlan(BaseMixin, models.Model):
     branches = models.PositiveIntegerField(default=1)
     students = models.PositiveIntegerField(default=1)
     active = models.BooleanField(_("active"), default=True, db_index=True)
+    paid = models.BooleanField(_("Paid"), default=False, db_index=True)
+    cancellation_reason = models.ForeignKey(
+        "UserPlanCancellationReason",
+        verbose_name=_("Cancellation Reason"),
+        on_delete=models.DO_NOTHING,
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     canceled_date = models.DateField(
         _("Canceled Date"), default=None, blank=True, null=True, db_index=True
     )
@@ -277,6 +312,7 @@ class AbstractUserPlan(BaseMixin, models.Model):
     trial_end_date = models.DateField(
         _("Trial End Date"), default=None, blank=True, null=True, db_index=True
     )
+
     class Meta:
         abstract = True
         verbose_name = _("User plan")
@@ -299,7 +335,10 @@ class AbstractUserPlan(BaseMixin, models.Model):
             return False
         # Check if today's date is within the trial period
         return self.trial_start_date <= date.today() <= self.trial_end_date
-
+    
+    def is_canceled(self):
+        return self.canceled_date != None
+    
     def days_left(self):
         if self.expire is None:
             return None
@@ -340,7 +379,9 @@ class AbstractUserPlan(BaseMixin, models.Model):
             # Check if the plan has a free trial
             if self.plan.free_trial_days > 0:
                 self.trial_start_date = now()  # Set the trial start date to now
-                self.trial_end_date = now() + timedelta(days=self.plan.free_trial_days)  # Set the trial end date
+                self.trial_end_date = now() + timedelta(
+                    days=self.plan.free_trial_days
+                )  # Set the trial end date
             # Plans without pricings don't need to expire
             if self.expire is None and self.plan.planpricing_set.count():
                 self.expire = now() + timedelta(
@@ -590,9 +631,12 @@ class AbstractUserPlan(BaseMixin, models.Model):
     def get_current_plan(self):
         """Tiny helper, very usefull in templates"""
         return AbstractPlan.get_concrete_model().get_current_plan(self.user)
+
     @property
     def price(self):
-        return (self.plan.price_per_student * self.students) + (self.plan.price() * self.branches)
+        return (self.plan.price_per_student * self.students) + (
+            self.plan.price() * self.branches
+        )
 
 
 class AbstractRecurringUserPlan(BaseMixin, models.Model):
@@ -836,8 +880,16 @@ class PlanPricingManager(models.Manager):
 class AbstractPlanPricing(BaseMixin, models.Model):
     plan = models.ForeignKey("Plan", on_delete=models.CASCADE)
     pricing = models.ForeignKey("Pricing", on_delete=models.CASCADE)
-    price = models.DecimalField(max_digits=7, decimal_places=2, db_index=True, validators=[MinValueValidator(1)])
-    regular_price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(1)])
+    price = models.DecimalField(
+        max_digits=7, decimal_places=2, db_index=True, validators=[MinValueValidator(1)]
+    )
+    regular_price = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
     order = models.IntegerField(default=0, null=False, blank=False)
     has_automatic_renewal = models.BooleanField(
         _("has automatic renewal"),

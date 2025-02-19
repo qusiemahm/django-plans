@@ -18,6 +18,7 @@ from plans.base.models import (
     AbstractQuota,
     AbstractRecurringUserPlan,
     AbstractUserPlan,
+    UserPlanCancellationReason,
 )
 
 from .signals import account_automatic_renewal
@@ -25,6 +26,7 @@ from django.db.models import Count, Q, Min
 from django.utils import timezone
 from django.conf import settings
 from .forms import PlanAdminForm, PricingAdminForm, QuotaAdminForm
+
 Invoice = AbstractInvoice.get_concrete_model()
 UserPlan = AbstractUserPlan.get_concrete_model()
 Plan = AbstractPlan.get_concrete_model()
@@ -35,6 +37,16 @@ Pricing = AbstractPricing.get_concrete_model()
 RecurringUserPlan = AbstractRecurringUserPlan.get_concrete_model()
 Order = AbstractOrder.get_concrete_model()
 BillingInfo = AbstractBillingInfo.get_concrete_model()
+
+
+class UserPlanCancellationReasonAdmin(admin.ModelAdmin):
+    search_fields = ("reason", "description")
+    list_display = (
+        "reason",
+        "description",
+        "hidden",
+    )
+    list_filter = ("hidden",)
 
 
 class UserLinkMixin(object):
@@ -53,33 +65,37 @@ class UserLinkMixin(object):
 
 class PlanQuotaInline(admin.TabularInline):
     model = PlanQuota
+
     def has_add_permission(self, request, obj=None):
         # Allow adding only when creating a new plan
         return obj is None
-        
+
     def has_delete_permission(self, request, obj=None):
         # Allow deletion only when creating a new plan
         return obj is None
-    
+
     def get_readonly_fields(self, request, obj=None):
         if obj:  # Only make readonly on change form
             return [field.name for field in PlanQuota._meta.fields]
         return []
 
+
 class PlanPricingInline(admin.TabularInline):
     model = PlanPricing
+
     def has_add_permission(self, request, obj=None):
         # Allow adding only when creating a new plan
         return obj is None
-        
+
     def has_delete_permission(self, request, obj=None):
         # Allow deletion only when creating a new plan
         return obj is None
-    
+
     def get_readonly_fields(self, request, obj=None):
         if obj:  # Only make readonly on change form
             return [field.name for field in PlanPricing._meta.fields]
         return []
+
 
 class PricingAdmin(admin.ModelAdmin):
     form = PricingAdminForm
@@ -125,33 +141,32 @@ def copy_plan(modeladmin, request, queryset):
 
 copy_plan.short_description = _("Make a plan copy")
 
+
 class PricingRangeFilter(admin.SimpleListFilter):
-    title = 'Price Range'
-    parameter_name = 'price_range'
+    title = "Price Range"
+    parameter_name = "price_range"
 
     def lookups(self, request, model_admin):
-        cu=settings.PLANS_CURRENCY
+        cu = settings.PLANS_CURRENCY
         return (
-            ('free', 'Free'),
-            ('1_300', f'1 {cu} to 300 {cu}'),
-            ('301_plus', f'above 300 {cu}'),
+            ("free", "Free"),
+            ("1_300", f"1 {cu} to 300 {cu}"),
+            ("301_plus", f"above 300 {cu}"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'free':
+        if self.value() == "free":
             return queryset.filter(
                 Q(planpricing__price=0) | Q(planpricing__isnull=True)
             ).distinct()
-        elif self.value() == '1_300':
+        elif self.value() == "1_300":
             return queryset.filter(
-                planpricing__price__gt=0,
-                planpricing__price__lte=300
+                planpricing__price__gt=0, planpricing__price__lte=300
             ).distinct()
-        elif self.value() == '301_plus':
-            return queryset.filter(
-                planpricing__price__gt=300
-            ).distinct()
+        elif self.value() == "301_plus":
+            return queryset.filter(planpricing__price__gt=300).distinct()
         return queryset
+
 
 class PlanAdmin(OrderedModelAdmin):
     form = PlanAdminForm
@@ -160,7 +175,11 @@ class PlanAdmin(OrderedModelAdmin):
         "customized__username",
         "customized__email",
     )
-    list_filter = ("available", "visible", PricingRangeFilter,)
+    list_filter = (
+        "available",
+        "visible",
+        PricingRangeFilter,
+    )
     list_display = [
         "name",
         "description",
@@ -179,53 +198,62 @@ class PlanAdmin(OrderedModelAdmin):
     actions = [
         copy_plan,
     ]
-    def get_queryset(self, request):
-        return (super(PlanAdmin, self)
-                .get_queryset(request)
-                .select_related("customized")
-                .prefetch_related("planpricing_set")
-                .annotate(
-                    min_price=Min('planpricing__price'),
-                    active_subscribers_count=Count(
-                        'userplan',
-                        filter=Q(
-                            userplan__active=True,
-                            userplan__expire__isnull=True
-                        ) | Q(
-                            userplan__active=True,
-                            userplan__expire__gte=timezone.now().date()
-                        )
-                    )
-                ))
 
-    # def get_readonly_fields(self, request, obj=None):
-    #     if obj:  # Only make readonly on change form
-    #         # Get all model fields
-    #         all_fields = [field.name for field in self.model._meta.fields]
-    #         # Remove 'available' and 'visible' from readonly fields
-    #         readonly_fields = [f for f in all_fields if f not in ('available', 'visible','default')]
-    #         return readonly_fields
-    #     return self.readonly_fields  # Use default readonly_fields for add form
+    def get_queryset(self, request):
+        return (
+            super(PlanAdmin, self)
+            .get_queryset(request)
+            .select_related("customized")
+            .prefetch_related("planpricing_set")
+            .annotate(
+                min_price=Min("planpricing__price"),
+                active_subscribers_count=Count(
+                    "userplan",
+                    filter=Q(userplan__active=True, userplan__expire__isnull=True)
+                    | Q(
+                        userplan__active=True,
+                        userplan__expire__gte=timezone.now().date(),
+                    ),
+                ),
+            )
+        )
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # Only make readonly on change form
+            # Get all model fields
+            all_fields = [field.name for field in self.model._meta.fields]
+            # Remove 'available' and 'visible' from readonly fields
+            readonly_fields = [
+                f for f in all_fields if f not in ("available", "visible", "default")
+            ]
+            return readonly_fields
+        return self.readonly_fields  # Use default readonly_fields for add form
 
     def get_price(self, obj):
         pricing = obj.planpricing_set.first()
         if pricing:
             return f"{pricing.price} {settings.PLANS_CURRENCY}"
         return "-"
+
     get_price.short_description = "Pricing"
-    get_price.admin_order_field = 'min_price'  # Enable sorting by price
+    get_price.admin_order_field = "min_price"  # Enable sorting by price
 
     def get_trial_period(self, obj):
         trial_period = settings.PLANS_ORDER_EXPIRATION
         if trial_period:
             return trial_period
         return 0
+
     get_trial_period.short_description = "Trial period in days"
 
     def get_active_subscribers(self, obj):
-        return getattr(obj, 'active_subscribers_count', 0)
+        return getattr(obj, "active_subscribers_count", 0)
+
     get_active_subscribers.short_description = "Active Subscribers"
-    get_active_subscribers.admin_order_field = 'active_subscribers_count'  # Enable sorting by subscriber count
+    get_active_subscribers.admin_order_field = (
+        "active_subscribers_count"  # Enable sorting by subscriber count
+    )
+
     def get_fields(self, request, obj=None):
         fields = list(super().get_fields(request, obj))
         fields.remove("name")
@@ -233,6 +261,7 @@ class PlanAdmin(OrderedModelAdmin):
         if obj and obj.plan_for == "vendors":
             fields.remove("price_per_student")
         return fields
+
 
 class BillingInfoAdmin(UserLinkMixin, admin.ModelAdmin):
     search_fields = ("user__username", "user__email", "tax_number", "name")
@@ -378,7 +407,7 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
     list_display = (
         "user",
         "plan",
-        "branches", 
+        "branches",
         "expire",
         "active",
         "recurring__renewal_triggered_by",
@@ -401,7 +430,9 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
         "students",
         "expire",
         "active",
+        "paid",
         "canceled_date",
+        "cancellation_reason",
         "activated_date",
         "trial_start_date",
         "trial_end_date",
@@ -438,11 +469,13 @@ class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
         return obj.recurring.pricing
 
     recurring__pricing.admin_order_field = "recurring__pricing"
+
     def get_fields(self, request, obj=None):
         fields = list(super().get_fields(request, obj))
         if obj and obj.plan.plan_for == "vendors":
             fields.remove("students")
         return fields
+
 
 admin.site.register(Quota, QuotaAdmin)
 admin.site.register(Plan, PlanAdmin)
@@ -451,3 +484,4 @@ admin.site.register(Pricing, PricingAdmin)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(BillingInfo, BillingInfoAdmin)
 admin.site.register(Invoice, InvoiceAdmin)
+admin.site.register(UserPlanCancellationReason, UserPlanCancellationReasonAdmin)
