@@ -185,7 +185,7 @@ class PlanAdmin(OrderedModelAdmin):
         "description",
         "get_price",
         "get_active_subscribers",
-        "get_trial_period",
+        "free_trial_days",
         "visible",
         "available",
         "created",
@@ -218,16 +218,16 @@ class PlanAdmin(OrderedModelAdmin):
             )
         )
 
-    def get_readonly_fields(self, request, obj=None):
-        if obj:  # Only make readonly on change form
-            # Get all model fields
-            all_fields = [field.name for field in self.model._meta.fields]
-            # Remove 'available' and 'visible' from readonly fields
-            readonly_fields = [
-                f for f in all_fields if f not in ("available", "visible", "default")
-            ]
-            return readonly_fields
-        return self.readonly_fields  # Use default readonly_fields for add form
+    # def get_readonly_fields(self, request, obj=None):
+    #     if obj:  # Only make readonly on change form
+    #         # Get all model fields
+    #         all_fields = [field.name for field in self.model._meta.fields]
+    #         # Remove 'available' and 'visible' from readonly fields
+    #         readonly_fields = [
+    #             f for f in all_fields if f not in ("available", "visible", "default")
+    #         ]
+    #         return readonly_fields
+    #     return self.readonly_fields  # Use default readonly_fields for add form
 
     def get_price(self, obj):
         pricing = obj.planpricing_set.first()
@@ -238,13 +238,6 @@ class PlanAdmin(OrderedModelAdmin):
     get_price.short_description = "Pricing"
     get_price.admin_order_field = "min_price"  # Enable sorting by price
 
-    def get_trial_period(self, obj):
-        trial_period = settings.PLANS_ORDER_EXPIRATION
-        if trial_period:
-            return trial_period
-        return 0
-
-    get_trial_period.short_description = "Trial period in days"
 
     def get_active_subscribers(self, obj):
         return getattr(obj, "active_subscribers_count", 0)
