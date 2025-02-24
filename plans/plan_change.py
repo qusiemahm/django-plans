@@ -21,15 +21,13 @@ class PlanChangePolicy(object):
             selected_pricing = plan_pricing
             if plan_pricing.pricing.period <= period:
                 break
-
         if selected_pricing:
             price = selected_pricing.price * userplan.branches
             if plan.plan_for == "schools":
                 price = price + plan.price_per_student * userplan.students
-                return (price / selected_pricing.pricing.period).quantize(
+            return (price / selected_pricing.pricing.period).quantize(
                 Decimal("1.00")
             )
-
         raise ValueError("Plan %s has no pricings." % plan)
 
     def _calculate_final_price(self, period, day_cost_diff):
@@ -100,7 +98,6 @@ class StandardPlanChangePolicy(PlanChangePolicy):
             return None
         else:
             return cost
-        
 
 
 def get_policy():
