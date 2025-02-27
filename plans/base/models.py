@@ -1050,6 +1050,12 @@ class AbstractOrder(BaseMixin, models.Model):
 
     def get_plan_extended_until(self):
         return self.user.userplan.get_plan_extended_until(self.plan, self.pricing)
+    
+    def complete_trial_order(self):
+        self.status = self.STATUS.COMPLETED
+        self.save()
+        order_completed.send(self)
+        return True
 
     @transaction.atomic()
     def complete_order(self):
