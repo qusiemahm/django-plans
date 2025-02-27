@@ -322,13 +322,14 @@ class OrderAdmin(admin.ModelAdmin):
         "completed",
         "tax",
         "amount",
+        "get_total_amount",
         "currency",
         "plan",
         "pricing",
         "plan_extended_from",
         "plan_extended_until",
     )
-    readonly_fields = ("created", "updated_at")
+    readonly_fields = ("created", "updated_at", "get_total_amount")
     list_display_links = list_display
     actions = [make_order_completed, make_order_returned, make_order_invoice]
     inlines = (InvoiceInline,)
@@ -339,6 +340,12 @@ class OrderAdmin(admin.ModelAdmin):
             .queryset(request)
             .select_related("plan", "pricing", "user")
         )
+
+    def get_total_amount(self, obj):
+        return obj.total()
+    
+    get_total_amount.short_description = "Total Amount"
+    get_total_amount.admin_order_field = "Total Amount"
 
 
 class InvoiceAdmin(admin.ModelAdmin):

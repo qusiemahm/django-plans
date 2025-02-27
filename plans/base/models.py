@@ -1007,7 +1007,7 @@ class AbstractOrder(BaseMixin, models.Model):
     )  # students=None is when students is not applicable
     first_time_fees = models.DecimalField(
         _("First time fees"),
-        max_digits=4,
+        max_digits=10,
         decimal_places=2,
         db_index=True,
         null=True,
