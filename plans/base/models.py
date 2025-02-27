@@ -954,6 +954,7 @@ class AbstractOrder(BaseMixin, models.Model):
             (3, "NOT_VALID", pgettext_lazy("Order status", "not valid")),
             (4, "CANCELED", pgettext_lazy("Order status", "canceled")),
             (5, "RETURNED", pgettext_lazy("Order status", "returned")),
+            (6, "PENDING", pgettext_lazy("Order status", "pending")),
         ]
     )
 
@@ -1075,6 +1076,14 @@ class AbstractOrder(BaseMixin, models.Model):
         else:
             return False
 
+    def pending_order(self):
+        if self.status != self.STATUS.PENDING:
+            self.status = self.STATUS.PENDING
+            self.save()
+            return True
+        else:
+            return False
+        
     def return_order(self):
         if self.status != self.STATUS.RETURNED:
             if self.status == self.STATUS.COMPLETED:
