@@ -1054,7 +1054,6 @@ class AbstractOrder(BaseMixin, models.Model):
     def complete_trial_order(self):
         self.status = self.STATUS.COMPLETED
         self.save()
-        order_completed.send(self)
         return True
 
     @transaction.atomic()
