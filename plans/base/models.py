@@ -1139,12 +1139,13 @@ class AbstractOrder(BaseMixin, models.Model):
 
     def total(self):
         amount = self.amount
-        if self.branches_number:
-            amount = amount * self.branches_number
-        if self.students_number:
-            amount = amount + (self.plan.price_per_student * self.students_number)
-        if self.first_time_fees:
-            amount = amount + self.first_time_fees
+        if self.pricing:
+            if self.branches_number:
+                amount = amount * self.branches_number
+            if self.students_number:
+                amount = amount + (self.plan.price_per_student * self.students_number)
+            if self.first_time_fees:
+                amount = amount + self.first_time_fees
         if self.tax is not None:
             return (Decimal(amount) * (Decimal(self.tax) + 100) / 100).quantize(
                 Decimal("1.00")
