@@ -67,16 +67,13 @@ class PlanQuotaInline(admin.TabularInline):
     model = PlanQuota
 
     def has_add_permission(self, request, obj=None):
-        # Allow adding only when creating a new plan
-        return obj is None
+        return True
 
     def has_delete_permission(self, request, obj=None):
         # Allow deletion only when creating a new plan
         return obj is None
 
     def get_readonly_fields(self, request, obj=None):
-        if obj:  # Only make readonly on change form
-            return [field.name for field in PlanQuota._meta.fields]
         return []
 
 
@@ -93,7 +90,8 @@ class PlanPricingInline(admin.TabularInline):
 
     def get_readonly_fields(self, request, obj=None):
         if obj:  # Only make readonly on change form
-            return [field.name for field in PlanPricing._meta.fields]
+            editable = {"price", "regular_price"}
+            return [field.name for field in PlanPricing._meta.fields if field.name not in editable]
         return []
 
 
