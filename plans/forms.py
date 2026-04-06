@@ -82,12 +82,21 @@ class FakePaymentsForm(forms.Form):
     )
 
 class PlanAdminForm(forms.ModelForm):
+    order = forms.IntegerField(
+        required=False,
+        min_value=0,
+        help_text='Display order (lower = first)',
+    )
+
     class Meta:
         model = Plan
         fields = '__all__'
+        exclude = ('order',)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields['order'].initial = self.instance.order
         if not self.instance.pk:
             self.fields['name_ar'].required = True
             self.fields['name_en'].required = True

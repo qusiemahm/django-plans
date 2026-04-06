@@ -181,6 +181,7 @@ class PlanAdmin(OrderedModelAdmin):
     list_display = [
         "name",
         "description",
+        "order",
         "get_price",
         "get_active_subscribers",
         "free_trial_days",
@@ -252,6 +253,12 @@ class PlanAdmin(OrderedModelAdmin):
         if obj and obj.plan_for == "vendors":
             fields.remove("price_per_student")
         return fields
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        new_order = form.cleaned_data.get("order")
+        if new_order is not None:
+            Plan.objects.filter(pk=obj.pk).update(order=new_order)
 
 
 class BillingInfoAdmin(UserLinkMixin, admin.ModelAdmin):
